@@ -211,7 +211,14 @@ void setup() {
 
         // enable Arduino interrupt detection
         Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)..."));
-        attachInterrupt(0, dmpDataReady, RISING);
+
+        // Attach to interrupt 0 (pin 2) on AVR, or pin 2 on ARM
+        #ifdef __arm__
+            attachInterrupt(2, dmpDataReady, RISING);
+        #else
+            attachInterrupt(0, dmpDataReady, RISING);
+        #endif
+        
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -370,3 +377,23 @@ void loop() {
         digitalWrite(LED_PIN, blinkState);
     }
 }
+
+// Paul Stoffregen AVR TWBR emulation for ARM
+// http://forum.pjrc.com/threads/23798-Sabernetics-I2C-OLED-display-Adafruit-SSD1306-library-problem?p=32988&viewfull=1#post32988
+#if defined(__arm__)
+class TWBRemulation
+{
+public:
+    inline TWBRemulation & operator = (int val) __attribute__((always_inline)) {
+    if (val == 12 || val == ((F_CPU / 400000) - 16) / 2) {
+        #if F_BUS == 48000000
+        I2C0_F = 0x1A; // 400 kHz
+        #elif F_BUS == 24000000
+        I2C0_F = 0x45; // 400 kHz
+        #endif
+    }
+    return *this;
+}
+};
+extern TWBRemulation TWBR;
+#endif
